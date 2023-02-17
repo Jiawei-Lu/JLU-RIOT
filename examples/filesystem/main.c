@@ -51,6 +51,8 @@
 #include "io1_xplained.h"
 #include "io1_xplained_params.h"
 
+#include "vfs_default.h"
+
 #define SDCARD_SPI_NUM ARRAY_SIZE(sdcard_spi_params)
 static io1_xplained_t dev;
 /* SD card devices are provided by drivers/sdcard_spi/sdcard_spi.c */
@@ -70,7 +72,7 @@ static mtd_dev_t *mtd0 = (mtd_dev_t*)&mtd_sdcard_dev;
 
 
 /* Flash mount point */
-#define FLASH_MOUNT_POINT   "/sda"
+#define FLASH_MOUNT_POINT   "/sd0"
 
 
 
@@ -336,6 +338,16 @@ int main(void)
         gpio_toggle(IO1_LED_PIN);
         ztimer_sleep(ZTIMER_MSEC, DELAY_1S);
     vfs_format(&flash_mount);
+
+    vfs_DIR mount = {0};
+
+    /* list mounted file systems */
+    puts("mount points:");
+    while (vfs_iterate_mount_dirs(&mount)) {
+        printf("\t%s\n", mount.mp->mount_point);
+    }
+    printf("\ndata dir: %s\n", VFS_DEFAULT_DATA);
+
     // /***************_format******************/
     // #if defined(FLASH_AND_FILESYSTEM_PRESENT)
     // int res1 = vfs_format(&flash_mount);

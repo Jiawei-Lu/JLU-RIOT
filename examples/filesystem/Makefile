@@ -37,6 +37,7 @@ USEMODULE += ps
 
 # Use the default file system
 USEMODULE += vfs_default
+USEMODULE += vfs_auto_format
 USEMODULE += vfs
 USEMODULE += constfs
 # USEMODULE += devfs
