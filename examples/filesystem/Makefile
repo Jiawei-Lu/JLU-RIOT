@@ -40,8 +40,19 @@ USEMODULE += vfs_default
 USEMODULE += vfs_auto_format
 USEMODULE += vfs
 USEMODULE += constfs
+USEMODULE += fatfs_vfs
+
+FEATURES_OPTIONAL += periph_rtc
+FEATURES_REQUIRED += periph_spi
+
+USEMODULE += fatfs_vfs_format
+CFLAGS += -DCONFIG_FATFS_FORMAT_ALLOC_STATIC=1
+
+FATFS_IMAGE_FILE_SIZE_MIB ?= 128
+# MODULE := fatfs_vfs
 # USEMODULE += devfs
-USEMODULE += littlefs2
+
+# USEMODULE += littlefs2
 # Enable to automatically format if mount fails
 #USEMODULE += vfs_auto_format
 
