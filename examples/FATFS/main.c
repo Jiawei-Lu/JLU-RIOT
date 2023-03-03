@@ -769,7 +769,23 @@ int main(void)
     test_mkrmdir();
     test_create();
     test_fstat();
-
+    vfs_mount(&flash_mount);
+    char data_file_path[] = "/sd0/DATA.TXT";
+    int fo = open(data_file_path, O_RDWR | O_CREAT, 00777);
+    if (fo < 0) {
+        printf("error while trying to create %s\n", data_file_path);
+        return 1;
+    }
+    else{
+        puts("creating file success");
+    }
+    char test_data[] = "testtesttesttesttest";
+    if (write(fo, test_data, strlen(test_data)) != (ssize_t)strlen(test_data)) {
+        puts("Error while writing");
+    }
+    
+    close(fo);
+    vfs_umount(&flash_mount);
     // /***************_format******************/
     // #if defined(FLASH_AND_FILESYSTEM_PRESENT)
     // int res1 = vfs_format(&flash_mount);
