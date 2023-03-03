@@ -769,6 +769,8 @@ int main(void)
     test_mkrmdir();
     test_create();
     test_fstat();
+
+    /*Typical file create and write test*/
     vfs_mount(&flash_mount);
     char data_file_path[] = "/sd0/DATA.TXT";
     int fo = open(data_file_path, O_RDWR | O_CREAT, 00777);
@@ -780,12 +782,30 @@ int main(void)
         puts("creating file success");
     }
     char test_data[] = "testtesttesttesttest";
+
+
     if (write(fo, test_data, strlen(test_data)) != (ssize_t)strlen(test_data)) {
         puts("Error while writing");
     }
-    
     close(fo);
+    int fr = open(data_file_path, O_RDONLY | O_CREAT, 00777);  //before open with O_RDWR which 
+                                                               //will conflict with open(file)
+                                                               //open(file)will equal 0, have to beb a O_RDPNLY for read
+    // char data_buf[sizeof(test_data)];
+    // printf("data:[],length=");
+    // vfs_read(fo,data_buf,sizeof(test_data));    
+    // printf("data:[],length=");
+    char c;
+
+    while (read(fr, &c, 1) != 0){
+    putchar(c);  //printf won't work here
+    }
+    puts("\n");
+       
+    close(fo);
+    puts("closing file");
     vfs_umount(&flash_mount);
+    puts("flash point umount");
     // /***************_format******************/
     // #if defined(FLASH_AND_FILESYSTEM_PRESENT)
     // int res1 = vfs_format(&flash_mount);
