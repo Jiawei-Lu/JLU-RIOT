@@ -110,6 +110,8 @@ uint8_t dst_address[] = {0};
 // int i = 0;
 unsigned iface = 0U;
 
+extern int _gnrc_netif_config(int argc, char **argv);
+
 /*-----------------FAT File System config Start-----------------*/
 static fatfs_desc_t fatfs;
 
@@ -268,9 +270,9 @@ static int _umount(int argc, char **argv)
 static const shell_command_t shell_commands[] = {
     { "cat", "print the content of a file", _cat },
     { "tee", "write a string in a file", _tee },
-    //{ "mount", "mount flash filesystem", _mount },
-    //{ "format", "format flash file system", _format },
-    //{ "umount", "unmount flash filesystem", _umount },
+    { "mount", "mount flash filesystem", _mount },
+    { "format", "format flash file system", _format },
+    { "umount", "unmount flash filesystem", _umount },
     { "coap", "CoAP example", gcoap_cli_cmd },
     { NULL, NULL, NULL }
 };
@@ -317,7 +319,7 @@ int main(void)
     printf("{\"IPv6 addresses\": [\"");
     netifs_print_ipv6("\", \"");
     puts("\"]}");
-    
+    _gnrc_netif_config(0, NULL);
     #if MODULE_MTD_SDCARD
     for(unsigned int i = 0; i < SDCARD_SPI_NUM; i++){
         mtd_sdcard_devs[i].base.driver = &mtd_sdcard_driver;
