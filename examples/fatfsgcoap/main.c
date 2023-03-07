@@ -138,7 +138,9 @@ static mtd_dev_t *mtd_sdcard = (mtd_dev_t*)&mtd_sdcard_devs[0];
 
 #define FLASH_AND_FILESYSTEM_PRESENT    1
 
+
 #endif
+
 /*-----------------FAT File System End-----------------------*/
 
 
@@ -267,6 +269,7 @@ static int _umount(int argc, char **argv)
 }
 
 
+
 static const shell_command_t shell_commands[] = {
     { "cat", "print the content of a file", _cat },
     { "tee", "write a string in a file", _tee },
@@ -304,22 +307,8 @@ static void _sd_card_cid(void)
     puts("+----------------------------------------+\n");
 }
 
-
-int main(void)
-{   
-    msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
-    server_init();
-
-    puts("gcoap example app");   
-    
-    puts("Waiting for address autoconfiguration...");
-    xtimer_sleep(3);
-
-    /* print network addresses */
-    printf("{\"IPv6 addresses\": [\"");
-    netifs_print_ipv6("\", \"");
-    puts("\"]}");
-    _gnrc_netif_config(0, NULL);
+static void _MTD_define(void)
+{
     #if MODULE_MTD_SDCARD
     for(unsigned int i = 0; i < SDCARD_SPI_NUM; i++){
         mtd_sdcard_devs[i].base.driver = &mtd_sdcard_driver;
@@ -336,6 +325,24 @@ int main(void)
     #if defined(MODULE_MTD_SDCARD)
     fatfs.dev = mtd_sdcard;
     #endif
+}
+
+int main(void)
+{   
+    msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
+    server_init();
+
+    puts("gcoap example app");   
+    
+    puts("Waiting for address autoconfiguration...");
+    xtimer_sleep(3);
+
+    /* print network addresses */
+    printf("{\"IPv6 addresses\": [\"");
+    netifs_print_ipv6("\", \"");
+    puts("\"]}");
+    _gnrc_netif_config(0, NULL);
+
     
     puts("gcoap example app");
     puts("insert SD-card and use 'init' command to set card to spi mode");
@@ -392,7 +399,56 @@ int main(void)
     gpio_toggle(IO1_LED_PIN);
     ztimer_sleep(ZTIMER_MSEC, DELAY_1S);
 
+    
+    /*------------Typical file create and write test end----------------*/
 
+    /*-------------CoAP CLient with RTC config and init Start------------*/
+/* for the thread running the shell */
+    struct tm time = {
+        .tm_year = 2020 - TM_YEAR_OFFSET,   /* years are counted from 1900 */
+        .tm_mon  =  4,                      /* 0 = January, 11 = December */
+        .tm_mday = 28,
+        .tm_hour = 23,
+        .tm_min  = 58,
+        .tm_sec  = 57
+    };   
+    rtc_init();
+    puts("1111111111111111111111111111111111");
+    print_time("  Setting clock to ", &time);
+    rtc_set_time(&time);
+    rtc_get_time(&time);	
+    
+    print_time("Clock value is now ", &time);
+    
+    
+
+
+    puts("Configured rpl:");
+    gnrc_rpl_init(7);
+    puts("printing route:");
+    while (gnrc_ipv6_nib_ft_iter(NULL, iface, &state, &entry)) {
+        char addr_str[IPV6_ADDR_MAX_STR_LEN];
+        if ((entry.dst_len == 0) || ipv6_addr_is_unspecified(&entry.dst)) {
+            printf("default%s ", (entry.primary ? "*" : ""));
+             puts("printing route:");   
+
+        }
+        else {
+            printf("%s/%u ", ipv6_addr_to_str(addr_str, &entry.dst, sizeof(addr_str)),entry.dst_len);
+            puts("printing route:");
+        }
+        if (!ipv6_addr_is_unspecified(&entry.next_hop)) {
+           printf("via %s ", ipv6_addr_to_str(addr_str, &entry.next_hop, sizeof(addr_str)));
+           puts("printing route:");
+        }
+        // printf("dev #%u\n", fte->iface);
+        // char a[i][4] = entry->iface;
+       // i++;
+    }
+
+    _gnrc_netif_config(0, NULL);
+
+    _MTD_define();
     /*11111111111111111*/
     vfs_format(&flash_mount);
 
@@ -450,53 +506,6 @@ int main(void)
     vfs_umount(&flash_mount);
     puts("flash point umount");
 
-    /*------------Typical file create and write test end----------------*/
-
-    /*-------------CoAP CLient with RTC config and init Start------------*/
-/* for the thread running the shell */
-    struct tm time = {
-        .tm_year = 2020 - TM_YEAR_OFFSET,   /* years are counted from 1900 */
-        .tm_mon  =  4,                      /* 0 = January, 11 = December */
-        .tm_mday = 28,
-        .tm_hour = 23,
-        .tm_min  = 58,
-        .tm_sec  = 57
-    };   
-    rtc_init();
-    puts("1111111111111111111111111111111111");
-    print_time("  Setting clock to ", &time);
-    rtc_set_time(&time);
-    rtc_get_time(&time);	
-    
-    print_time("Clock value is now ", &time);
-    
-    
-
-
-    puts("Configured rpl:");
-    gnrc_rpl_init(7);
-    puts("printing route:");
-    while (gnrc_ipv6_nib_ft_iter(NULL, iface, &state, &entry)) {
-        char addr_str[IPV6_ADDR_MAX_STR_LEN];
-        if ((entry.dst_len == 0) || ipv6_addr_is_unspecified(&entry.dst)) {
-            printf("default%s ", (entry.primary ? "*" : ""));
-             puts("printing route:");   
-
-        }
-        else {
-            printf("%s/%u ", ipv6_addr_to_str(addr_str, &entry.dst, sizeof(addr_str)),entry.dst_len);
-            puts("printing route:");
-        }
-        if (!ipv6_addr_is_unspecified(&entry.next_hop)) {
-           printf("via %s ", ipv6_addr_to_str(addr_str, &entry.next_hop, sizeof(addr_str)));
-           puts("printing route:");
-        }
-        // printf("dev #%u\n", fte->iface);
-        // char a[i][4] = entry->iface;
-       // i++;
-    }
-
-    
 
     /* start shell */
     puts("All up, running the shell now");
