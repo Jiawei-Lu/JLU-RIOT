@@ -1,0 +1,8 @@
+ifneq(,$(BOARD_NUM))
+  PORT = /dev/riot/tty-$(BOARD)-$(BOARD_NUM)
+else
+  PORT = /dev/riot/tty-$(BOARD)
+endif
+DEBUG_ADAPTER_ID = $(\
+  shell udevadm info -q property $(PORT) |\
+  sed -n ’/ID_SERIAL_SHORT/ {s/ID_SERIAL_SHORT=//p}’)

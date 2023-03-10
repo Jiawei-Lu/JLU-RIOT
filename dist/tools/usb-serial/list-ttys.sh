@@ -3,4 +3,4 @@
 # Public License v2.1. See the file LICENSE in the top level directory for more
 # details.
 
-./ttys.py --format path
+$HOME/RIOT/dist/tools/usb-serial/ttys.py --format path
