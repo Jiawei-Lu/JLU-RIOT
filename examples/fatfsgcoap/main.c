@@ -49,9 +49,21 @@
 
 /*PM layer*/
 #include "periph/pm.h"
+#ifdef MODULE_PERIPH_GPIO
+#include "board.h"
+#include "periph/gpio.h"
+#endif
 #ifdef MODULE_PM_LAYERED
+#ifdef MODULE_PERIPH_RTC
+#include "periph/rtc.h"
+#endif
 #include "pm_layered.h"
 #endif
+
+/*Radio netif*/
+#include "net/gnrc/netif.h"
+#include "net/netif.h"
+#include "net/gnrc/netapi.h"
 
 /*IO1 Xplianed Extension Board*/
 #include "at30tse75x.h"
@@ -93,10 +105,14 @@ static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 #define TM_YEAR_OFFSET      (1900)
 #define DELAY_1S   (1U) /* 1 seconds delay between each test */
 
+/*Radio netif*/
+gnrc_netif_t* netif = NULL;
+
 static io1_xplained_t dev;
 
-int wakeup_gap =200;
-// static unsigned cnt = 0;
+int wakeup_gap =10;
+static unsigned cnt = 0;
+
 /*RTC struct defination*/
 struct tm coaptime;
 struct tm alarm_time;
@@ -270,15 +286,7 @@ static int _umount(int argc, char **argv)
 
 
 
-static const shell_command_t shell_commands[] = {
-    { "cat", "print the content of a file", _cat },
-    { "tee", "write a string in a file", _tee },
-    { "mount", "mount flash filesystem", _mount },
-    { "format", "format flash file system", _format },
-    { "umount", "unmount flash filesystem", _umount },
-    { "coap", "CoAP example", gcoap_cli_cmd },
-    { NULL, NULL, NULL }
-};
+
 
 
 void print_time(const char *label, const struct tm *time)
@@ -291,6 +299,146 @@ void print_time(const char *label, const struct tm *time)
             time->tm_min,
             time->tm_sec);
 }
+
+// static void cb_rtc(void *arg)
+// {
+//     puts(arg);
+// }
+// // static void cb_rtc_sleep(void *arg)
+// // {
+// //     puts(arg);
+// // }
+
+void radio_off(gnrc_netif_t *netif){
+    netopt_state_t state = NETOPT_STATE_SLEEP;
+    while ((netif = gnrc_netif_iter(netif))) {
+            /* retry if busy */
+            while (gnrc_netapi_set(netif->pid, NETOPT_STATE, 0,
+                &state, sizeof(state)) == -EBUSY) {}
+    }
+}
+void radio_on(gnrc_netif_t *netif){
+    netopt_state_t state = NETOPT_STATE_IDLE;
+    while ((netif = gnrc_netif_iter(netif))) {
+            /* retry if busy */
+            while (gnrc_netapi_set(netif->pid, NETOPT_STATE, 0,
+                &state, sizeof(state)) == -EBUSY) {}
+    }
+}
+
+
+
+static int check_mode_duration(int argc, char **argv)
+{
+    if (argc != 3) {
+        printf("Usage: %s <power mode> <duration (s)>\n", argv[0]);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int parse_mode(char *argv)
+{
+    uint8_t mode = atoi(argv);
+
+    if (mode >= PM_NUM_MODES) {
+        printf("Error: power mode not in range 0 - %d.\n", PM_NUM_MODES - 1);
+        return -1;
+    }
+
+    return mode;
+}
+
+static int parse_duration(char *argv)
+{
+    int duration = atoi(argv);
+
+    if (duration < 0) {
+        puts("Error: duration must be a positive number.");
+        return -1;
+    }
+
+    return duration;
+}
+
+static void cb_rtc(void *arg)
+{
+    int level = (int)arg;
+
+    pm_set(level);
+}
+
+static void cb_rtc_puts(void *arg)
+{
+    puts(arg);
+}
+// static void cb_rtc_put(void *arg)
+// {
+//     puts(arg);
+// }
+
+static int cmd_unblock_rtc(int argc, char **argv)
+{
+    if (check_mode_duration(argc, argv) != 0) {
+        return 1;
+    }
+
+    int mode = parse_mode(argv[1]);
+    int duration = parse_duration(argv[2]);
+
+    if (mode < 0 || duration < 0) {
+        return 1;
+    }
+
+    pm_blocker_t pm_blocker = pm_get_blocker();
+    if (pm_blocker.blockers[mode] == 0) {
+        printf("Mode %d is already unblocked.\n", mode);
+        return 1;
+    }
+
+    printf("Unblocking power mode %d for %d seconds.\n", mode, duration);
+    fflush(stdout);
+
+    struct tm time;
+
+    rtc_get_time(&time);
+    time.tm_sec += duration;
+    rtc_set_alarm(&time, cb_rtc, (void *)mode);
+
+    pm_unblock(mode);
+
+    return 0;
+}
+
+static int cmd_set_rtc(int argc, char **argv)
+{
+    if (check_mode_duration(argc, argv) != 0) {
+        return 1;
+    }
+
+    int mode = parse_mode(argv[1]);
+    int duration = parse_duration(argv[2]);
+
+    if (mode < 0 || duration < 0) {
+        return 1;
+    }
+
+    printf("Setting power mode %d for %d seconds.\n", mode, duration);
+    fflush(stdout);
+
+    struct tm time;
+
+    rtc_get_time(&time);
+    time.tm_sec += duration;
+    rtc_set_alarm(&time, cb_rtc_puts, "The alarm rang");
+
+    pm_set(mode);
+    radio_off(netif);
+
+    return 0;
+}
+
 
 static void _sd_card_cid(void)
 {
@@ -326,6 +474,18 @@ static void _MTD_define(void)
     fatfs.dev = mtd_sdcard;
     #endif
 }
+
+static const shell_command_t shell_commands[] = {
+    { "cat", "print the content of a file", _cat },
+    { "tee", "write a string in a file", _tee },
+    { "mount", "mount flash filesystem", _mount },
+    { "format", "format flash file system", _format },
+    { "umount", "unmount flash filesystem", _umount },
+    { "coap", "CoAP example", gcoap_cli_cmd },
+    { "set_rtc", "temporary set power mode", cmd_set_rtc },
+    { "unblock_rtc", "temporarily unblock power mode", cmd_unblock_rtc },
+    { NULL, NULL, NULL }
+};
 
 int main(void)
 {   
@@ -448,6 +608,10 @@ int main(void)
 
     _gnrc_netif_config(0, NULL);
 
+    
+
+
+
     _MTD_define();
     /*11111111111111111*/
     vfs_format(&flash_mount);
@@ -505,6 +669,57 @@ int main(void)
     /*11111111111111111*/
     vfs_umount(&flash_mount);
     puts("flash point umount");
+
+    while (1) {
+        ++cnt;
+        rtc_get_time(&current_time);
+        print_time("currenttime:\n", &current_time);
+        int current_timestamp= mktime(&current_time);
+        printf("current time stamp: %d\n", current_timestamp);
+        int alarm_timestamp = 0;
+        if ((int)(current_timestamp % 20) < (wakeup_gap*1)){
+            puts("111");
+            pm_set(1);
+            radio_on(netif);
+            int chance = ( wakeup_gap ) - ( current_timestamp % 20 );
+            alarm_timestamp = (current_timestamp / 20) *20+ (wakeup_gap * 1);
+            alarm_timestamp = alarm_timestamp- 1577836800;
+            rtc_localtime(alarm_timestamp, &alarm_time);
+            /*RTC SET ALARM*/
+            rtc_set_alarm(&alarm_time, cb_rtc_puts, "Time to sleep");
+            print_time("alarm time:\n", &alarm_time);
+            printf("---------%ds\n",chance);
+            puts("xtimer sleep");
+                        
+            xtimer_sleep(chance);
+
+            // rtc_set_alarm(&alarm_time, cb_rtc, "111");
+            
+
+            /*源代码*/
+            // rtc_get_alarm(&time);
+            // inc_secs(&time, PERIOD);
+            // rtc_set_alarm(&time, cb, &rtc_mtx);
+        }
+        else{
+            //printf("fflush");
+            puts("222");
+            fflush(stdout);
+            
+            radio_off(netif);
+            alarm_timestamp =  current_timestamp + (20- (current_timestamp % 20));
+            // alarm_timestamp = (current_timestamp / 360) *360+ (wakeup_gap * 1);
+            alarm_timestamp = alarm_timestamp - 1577836800;
+            rtc_localtime(alarm_timestamp, &alarm_time);
+            print_time("alarm time:\n", &alarm_time);
+            
+            /*RTC SET ALARM*/
+            rtc_set_alarm(&alarm_time, cb_rtc_puts, "TIme to wake up");//(void *)modetest);
+            // rtc_set_alarm(&alarm_time, cb_rtc, (void *)modetest);
+            pm_set(0);
+            // pm_set(0);
+        }
+    }
 
 
     /* start shell */
