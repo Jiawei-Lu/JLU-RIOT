@@ -110,7 +110,7 @@ gnrc_netif_t* netif = NULL;
 
 static io1_xplained_t dev;
 
-int wakeup_gap =20;
+int wakeup_gap =60;
 static unsigned cnt = 0;
 
 /*RTC struct defination*/
@@ -678,12 +678,12 @@ int main(void)
         int current_timestamp= mktime(&current_time);
         printf("current time stamp: %d\n", current_timestamp);
         int alarm_timestamp = 0;
-        if ((int)(current_timestamp % 40) < (wakeup_gap*1)){
+        if ((int)(current_timestamp % 3600) < (wakeup_gap*1)){
             puts("111");
             pm_set(1);
             radio_on(netif);
-            int chance = ( wakeup_gap ) - ( current_timestamp % 40 );
-            alarm_timestamp = (current_timestamp / 40) *40+ (wakeup_gap * 1);
+            int chance = ( wakeup_gap ) - ( current_timestamp % 3600 );
+            alarm_timestamp = (current_timestamp / 3600) *3600+ (wakeup_gap * 1);
             alarm_timestamp = alarm_timestamp- 1577836800;
             rtc_localtime(alarm_timestamp, &alarm_time);
             /*RTC SET ALARM*/
@@ -708,7 +708,7 @@ int main(void)
             fflush(stdout);
             
             radio_off(netif);
-            alarm_timestamp =  current_timestamp + (40- (current_timestamp % 40));
+            alarm_timestamp =  current_timestamp + (3600- (current_timestamp % 3600));
             // alarm_timestamp = (current_timestamp / 360) *360+ (wakeup_gap * 1);
             alarm_timestamp = alarm_timestamp - 1577836800;
             rtc_localtime(alarm_timestamp, &alarm_time);
