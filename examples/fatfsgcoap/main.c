@@ -110,7 +110,7 @@ gnrc_netif_t* netif = NULL;
 
 static io1_xplained_t dev;
 
-int wakeup_gap =10;
+int wakeup_gap =20;
 static unsigned cnt = 0;
 
 /*RTC struct defination*/
@@ -440,20 +440,20 @@ static int cmd_set_rtc(int argc, char **argv)
 }
 
 
-static void _sd_card_cid(void)
-{
-    puts("SD Card CID info:");
-    printf("MID: %d\n", dev.sdcard.cid.MID);
-    printf("OID: %c%c\n", dev.sdcard.cid.OID[0], dev.sdcard.cid.OID[1]);
-    printf("PNM: %c%c%c%c%c\n",
-           dev.sdcard.cid.PNM[0], dev.sdcard.cid.PNM[1], dev.sdcard.cid.PNM[2],
-           dev.sdcard.cid.PNM[3], dev.sdcard.cid.PNM[4]);
-    printf("PRV: %u\n", dev.sdcard.cid.PRV);
-    printf("PSN: %" PRIu32 "\n", dev.sdcard.cid.PSN);
-    printf("MDT: %u\n", dev.sdcard.cid.MDT);
-    printf("CRC: %u\n", dev.sdcard.cid.CID_CRC);
-    puts("+----------------------------------------+\n");
-}
+// static void _sd_card_cid(void)
+// {
+//     puts("SD Card CID info:");
+//     printf("MID: %d\n", dev.sdcard.cid.MID);
+//     printf("OID: %c%c\n", dev.sdcard.cid.OID[0], dev.sdcard.cid.OID[1]);
+//     printf("PNM: %c%c%c%c%c\n",
+//            dev.sdcard.cid.PNM[0], dev.sdcard.cid.PNM[1], dev.sdcard.cid.PNM[2],
+//            dev.sdcard.cid.PNM[3], dev.sdcard.cid.PNM[4]);
+//     printf("PRV: %u\n", dev.sdcard.cid.PRV);
+//     printf("PSN: %" PRIu32 "\n", dev.sdcard.cid.PSN);
+//     printf("MDT: %u\n", dev.sdcard.cid.MDT);
+//     printf("CRC: %u\n", dev.sdcard.cid.CID_CRC);
+//     puts("+----------------------------------------+\n");
+// }
 
 static void _MTD_define(void)
 {
@@ -532,20 +532,21 @@ int main(void)
 
     /* Card detect pin is inverted */
     if (!gpio_read(IO1_SDCARD_SPI_PARAM_DETECT)) {
-        _sd_card_cid();
-        ztimer_sleep(ZTIMER_MSEC, DELAY_1S);
+        // _sd_card_cid();
+        // ztimer_sleep(ZTIMER_MSEC, DELAY_1S);
     }
 
-    uint16_t light;
-    io1_xplained_read_light_level(&light);
-    printf("Light level: %i\n"
-            "+-------------------------------------+\n",
-            light);
+    // uint16_t light;
+    // io1_xplained_read_light_level(&light);
+    // printf("Light level: %i\n"
+    //         "+-------------------------------------+\n",
+    //         light);
     ztimer_sleep(ZTIMER_MSEC, DELAY_1S);
 
     /* set led */
     gpio_set(IO1_LED_PIN);
     ztimer_sleep(ZTIMER_MSEC, DELAY_1S);
+    
 
     /* clear led */
     gpio_clear(IO1_LED_PIN);
@@ -558,12 +559,12 @@ int main(void)
     /* toggle led again */
     gpio_toggle(IO1_LED_PIN);
     ztimer_sleep(ZTIMER_MSEC, DELAY_1S);
-
+    
     
     /*------------Typical file create and write test end----------------*/
 
     /*-------------CoAP CLient with RTC config and init Start------------*/
-/* for the thread running the shell */
+    /* for the thread running the shell */
     struct tm time = {
         .tm_year = 2020 - TM_YEAR_OFFSET,   /* years are counted from 1900 */
         .tm_mon  =  4,                      /* 0 = January, 11 = December */
@@ -582,7 +583,7 @@ int main(void)
     
     
 
-
+    /*RPL config and print*/
     puts("Configured rpl:");
     gnrc_rpl_init(7);
     puts("printing route:");
@@ -606,14 +607,14 @@ int main(void)
        // i++;
     }
 
-    _gnrc_netif_config(0, NULL);
+    // _gnrc_netif_config(0, NULL);
 
     
 
 
-
+    /*FS part*/
     _MTD_define();
-    /*11111111111111111*/
+    
     vfs_format(&flash_mount);
 
     vfs_DIR mount = {0};
@@ -677,12 +678,12 @@ int main(void)
         int current_timestamp= mktime(&current_time);
         printf("current time stamp: %d\n", current_timestamp);
         int alarm_timestamp = 0;
-        if ((int)(current_timestamp % 20) < (wakeup_gap*1)){
+        if ((int)(current_timestamp % 40) < (wakeup_gap*1)){
             puts("111");
             pm_set(1);
             radio_on(netif);
-            int chance = ( wakeup_gap ) - ( current_timestamp % 20 );
-            alarm_timestamp = (current_timestamp / 20) *20+ (wakeup_gap * 1);
+            int chance = ( wakeup_gap ) - ( current_timestamp % 40 );
+            alarm_timestamp = (current_timestamp / 40) *40+ (wakeup_gap * 1);
             alarm_timestamp = alarm_timestamp- 1577836800;
             rtc_localtime(alarm_timestamp, &alarm_time);
             /*RTC SET ALARM*/
@@ -707,7 +708,7 @@ int main(void)
             fflush(stdout);
             
             radio_off(netif);
-            alarm_timestamp =  current_timestamp + (20- (current_timestamp % 20));
+            alarm_timestamp =  current_timestamp + (40- (current_timestamp % 40));
             // alarm_timestamp = (current_timestamp / 360) *360+ (wakeup_gap * 1);
             alarm_timestamp = alarm_timestamp - 1577836800;
             rtc_localtime(alarm_timestamp, &alarm_time);
